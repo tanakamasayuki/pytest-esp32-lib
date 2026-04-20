@@ -1,5 +1,6 @@
 @echo off
 setlocal
 
-cd /d "%~dp0"
+pushd "%~dp0"
 call "%~dp0run.bat" --run-mode=test %*
+popd

@@ -1,0 +1,8 @@
+@echo off
+REM Copy this file to run.local.bat and adjust it for your environment.
+REM If not set, run.bat falls back to "%~dp0.venv.win".
+REM Examples:
+REM set "UV_PROJECT_ENVIRONMENT=%~dp0.venv.win"
+REM set "UV_PROJECT_ENVIRONMENT=C:\tmp\.venv_pytest"
+
+set "UV_PROJECT_ENVIRONMENT=C:\tmp\.venv_pytest"

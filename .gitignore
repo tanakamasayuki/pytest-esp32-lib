@@ -13,5 +13,6 @@ build/
 
 *.log
 tests/report.html
+tests/run.local.bat
 tests/.env
 tests/.env.local
