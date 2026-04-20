@@ -16,6 +16,19 @@ The goal is not to provide a full framework. It is a small, practical reference 
 - Switching Arduino CLI sketch profiles such as `esp32` and `esp32s3`
 - Passing environment-specific values such as Wi-Fi credentials into test sketches
 
+## Related Repository
+
+There is a companion repository for testing a plain Arduino sketch project instead of an Arduino library:
+
+- `pytest-esp32-ino`
+  https://github.com/tanakamasayuki/pytest-esp32-ino
+
+If you are deciding where to start, this repository is the cleaner reference.
+The library layout makes the test setup simpler because shared code can be referenced directly from `src/`.
+
+The `pytest-esp32-ino` repository is useful when Arduino IDE compatibility is a requirement.
+In that case, application code stays inside the sketch directory, and the `tests/` side may need thin wrapper files to reference `.h` / `.cpp` files from the sketch project.
+
 ## Repository Layout
 
 - `src/`
