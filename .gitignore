@@ -13,3 +13,5 @@ build/
 
 *.log
 tests/report.html
+tests/.env
+tests/.env.local
