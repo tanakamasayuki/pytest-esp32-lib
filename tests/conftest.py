@@ -1,6 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
+import tomllib
 import pytest
 
 TESTS_DIR = Path(__file__).parent
@@ -73,6 +74,55 @@ def resolve_option_or_env(config, option_name, *env_names):
     return get_first_env(*env_names)
 
 
+def get_resolved_settings(config):
+    return {
+        "TEST_SERIAL_PORT": resolve_option_or_env(config, "port", "TEST_SERIAL_PORT", "ESPPORT"),
+        "TEST_WIFI_SSID": resolve_option_or_env(config, "wifi_ssid", "TEST_WIFI_SSID"),
+        "TEST_WIFI_PASSWORD": resolve_option_or_env(config, "wifi_password", "TEST_WIFI_PASSWORD"),
+    }
+
+
+def load_build_config(app_path):
+    config_path = Path(app_path) / "build_config.toml"
+    if not config_path.is_file():
+        return {}
+
+    with config_path.open("rb") as f:
+        data = tomllib.load(f)
+
+    defines = data.get("defines", {})
+    if not isinstance(defines, dict):
+        raise ValueError(f"'defines' in {config_path} must be a table")
+
+    return defines
+
+
+def format_define_value(value):
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def get_build_properties(config, app_path):
+    resolved_settings = get_resolved_settings(config)
+    defines = load_build_config(app_path)
+    extra_flags = []
+
+    for setting_name, define_name in defines.items():
+        value = resolved_settings.get(setting_name)
+        if value is None:
+            continue
+
+        extra_flags.append(f"-D{define_name}={format_define_value(value)}")
+
+    if not extra_flags:
+        return []
+
+    return [
+        "--build-property",
+        f"build.extra_flags={' '.join(extra_flags)}",
+    ]
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-mode",
@@ -99,31 +149,34 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    resolved_port = resolve_option_or_env(config, "port", "TEST_SERIAL_PORT", "ESPPORT")
+    resolved_settings = get_resolved_settings(config)
+
+    resolved_port = resolved_settings["TEST_SERIAL_PORT"]
     if resolved_port and not config.getoption("port"):
         config.option.port = resolved_port
 
-    resolved_wifi_ssid = resolve_option_or_env(config, "wifi_ssid", "TEST_WIFI_SSID")
+    resolved_wifi_ssid = resolved_settings["TEST_WIFI_SSID"]
     if resolved_wifi_ssid and not config.getoption("wifi_ssid"):
         config.option.wifi_ssid = resolved_wifi_ssid
 
-    resolved_wifi_password = resolve_option_or_env(config, "wifi_password", "TEST_WIFI_PASSWORD")
+    resolved_wifi_password = resolved_settings["TEST_WIFI_PASSWORD"]
     if resolved_wifi_password and not config.getoption("wifi_password"):
         config.option.wifi_password = resolved_wifi_password
 
 
 def pytest_report_header(config):
     profile = get_profile_name(config) or "default"
+    resolved_settings = get_resolved_settings(config)
     header = [
         f"profile: {profile}",
         f"build_dir_name: {profile}",
     ]
 
-    resolved_port = resolve_option_or_env(config, "port", "TEST_SERIAL_PORT", "ESPPORT")
+    resolved_port = resolved_settings["TEST_SERIAL_PORT"]
     if resolved_port:
         header.append(f"port: {resolved_port}")
 
-    resolved_wifi_ssid = resolve_option_or_env(config, "wifi_ssid", "TEST_WIFI_SSID")
+    resolved_wifi_ssid = resolved_settings["TEST_WIFI_SSID"]
     if resolved_wifi_ssid:
         header.append(f"wifi_ssid: {resolved_wifi_ssid}")
 
@@ -164,6 +217,8 @@ def build(request):
     profile = get_profile_name(config)
     if profile:
         command.extend(["-m", profile])
+
+    command.extend(get_build_properties(config, app_path))
 
     subprocess.run(command, cwd=app_path, check=True)
 

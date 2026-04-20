@@ -1,42 +1,17 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#ifndef TEST_WIFI_SSID
+#define TEST_WIFI_SSID ""
+#endif
+
+#ifndef TEST_WIFI_PASSWORD
+#define TEST_WIFI_PASSWORD ""
+#endif
+
 namespace
 {
-
-  constexpr unsigned long kSerialTimeoutMs = 30000;
   constexpr unsigned long kWifiTimeoutMs = 30000;
-
-  String readLineFromSerial(unsigned long timeout_ms)
-  {
-    const unsigned long start = millis();
-    String value;
-
-    while (millis() - start < timeout_ms)
-    {
-      while (Serial.available() > 0)
-      {
-        const char ch = static_cast<char>(Serial.read());
-        if (ch == '\r')
-        {
-          continue;
-        }
-
-        if (ch == '\n')
-        {
-          value.trim();
-          return value;
-        }
-
-        value += ch;
-      }
-
-      delay(10);
-    }
-
-    value.trim();
-    return value;
-  }
 
   bool connectToWifi(const String &ssid, const String &password)
   {
@@ -70,9 +45,8 @@ void setup()
   Serial.begin(115200);
   delay(1000);
 
-  Serial.println("WIFI_RUNNER_READY");
-  const String ssid = readLineFromSerial(kSerialTimeoutMs);
-  const String password = readLineFromSerial(kSerialTimeoutMs);
+  const String ssid = TEST_WIFI_SSID;
+  const String password = TEST_WIFI_PASSWORD;
 
   if (ssid.isEmpty())
   {
