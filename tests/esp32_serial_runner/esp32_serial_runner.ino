@@ -3,12 +3,14 @@
 
 AddTest add_test;
 
-void print_add_result(const int left, const int right) {
+void print_add_result(const int left, const int right)
+{
   const int result = add_test.add(left, right);
   Serial.printf("ADD %d %d %d\n", left, right, result);
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(1000);
 
@@ -19,6 +21,7 @@ void setup() {
   Serial.println("SERIAL_RUNNER_DONE");
 }
 
-void loop() {
+void loop()
+{
   delay(1000);
 }

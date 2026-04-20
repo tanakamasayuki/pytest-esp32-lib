@@ -4,25 +4,31 @@
 
 AddTest add_test;
 
-void setUp(void) {
+void setUp(void)
+{
 }
 
-void tearDown(void) {
+void tearDown(void)
+{
 }
 
-void test_add_returns_sum_for_positive_integers(void) {
+void test_add_returns_sum_for_positive_integers(void)
+{
   TEST_ASSERT_EQUAL_INT(5, add_test.add(2, 3));
 }
 
-void test_add_returns_zero_for_zero_inputs(void) {
+void test_add_returns_zero_for_zero_inputs(void)
+{
   TEST_ASSERT_EQUAL_INT(0, add_test.add(0, 0));
 }
 
-void test_add_handles_negative_values(void) {
+void test_add_handles_negative_values(void)
+{
   TEST_ASSERT_EQUAL_INT(-1, add_test.add(2, -3));
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(1000);
 
@@ -33,6 +39,7 @@ void setup() {
   UNITY_END();
 }
 
-void loop() {
+void loop()
+{
   delay(1000);
 }

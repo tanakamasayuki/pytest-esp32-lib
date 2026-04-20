@@ -1,75 +1,87 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-namespace {
+namespace
+{
 
-constexpr unsigned long kSerialTimeoutMs = 30000;
-constexpr unsigned long kWifiTimeoutMs = 30000;
+  constexpr unsigned long kSerialTimeoutMs = 30000;
+  constexpr unsigned long kWifiTimeoutMs = 30000;
 
-String readLineFromSerial(unsigned long timeout_ms) {
-  const unsigned long start = millis();
-  String value;
+  String readLineFromSerial(unsigned long timeout_ms)
+  {
+    const unsigned long start = millis();
+    String value;
 
-  while (millis() - start < timeout_ms) {
-    while (Serial.available() > 0) {
-      const char ch = static_cast<char>(Serial.read());
-      if (ch == '\r') {
-        continue;
+    while (millis() - start < timeout_ms)
+    {
+      while (Serial.available() > 0)
+      {
+        const char ch = static_cast<char>(Serial.read());
+        if (ch == '\r')
+        {
+          continue;
+        }
+
+        if (ch == '\n')
+        {
+          value.trim();
+          return value;
+        }
+
+        value += ch;
       }
 
-      if (ch == '\n') {
-        value.trim();
-        return value;
+      delay(10);
+    }
+
+    value.trim();
+    return value;
+  }
+
+  bool connectToWifi(const String &ssid, const String &password)
+  {
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true, true);
+    delay(200);
+
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    Serial.printf("SSID '%s'...\n", ssid.c_str());
+    Serial.printf("Password length %u...\n", password.length());
+
+    const unsigned long start = millis();
+    while (millis() - start < kWifiTimeoutMs)
+    {
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        return true;
       }
 
-      value += ch;
+      delay(250);
     }
 
-    delay(10);
+    return false;
   }
 
-  value.trim();
-  return value;
-}
+} // namespace
 
-bool connectToWifi(const String &ssid, const String &password) {
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect(true, true);
-  delay(200);
-
-  WiFi.begin(ssid.c_str(), password.c_str());
-
-  const unsigned long start = millis();
-  while (millis() - start < kWifiTimeoutMs) {
-    if (WiFi.status() == WL_CONNECTED) {
-      return true;
-    }
-
-    delay(250);
-  }
-
-  return false;
-}
-
-}  // namespace
-
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(1000);
 
   Serial.println("WIFI_RUNNER_READY");
-  Serial.println("WIFI_SSID?");
   const String ssid = readLineFromSerial(kSerialTimeoutMs);
-
-  Serial.println("WIFI_PASSWORD?");
   const String password = readLineFromSerial(kSerialTimeoutMs);
 
-  if (ssid.isEmpty()) {
+  if (ssid.isEmpty())
+  {
     Serial.println("WIFI_ERROR missing_ssid");
     return;
   }
 
-  if (!connectToWifi(ssid, password)) {
+  if (!connectToWifi(ssid, password))
+  {
     Serial.printf("WIFI_ERROR connect_failed %d\n", static_cast<int>(WiFi.status()));
     return;
   }
@@ -78,6 +90,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 }
 
-void loop() {
+void loop()
+{
   delay(1000);
 }
