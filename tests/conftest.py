@@ -4,6 +4,7 @@ from pathlib import Path
 import tomllib
 
 import pytest
+from pytest_metadata.plugin import metadata_key
 
 TESTS_DIR = Path(__file__).parent
 DOTENV_FILES = (TESTS_DIR / ".env", TESTS_DIR / ".env.local")
@@ -118,6 +119,12 @@ def get_build_properties(config, app_path):
         "--build-property",
         f"build.extra_flags={' '.join(extra_flags)}",
     ]
+
+
+def pytest_configure(config):
+    profile = get_profile_name(config) or "default"
+
+    config.stash[metadata_key]["Profile"] = profile
 
 
 # Show the active profile in the pytest session header.
