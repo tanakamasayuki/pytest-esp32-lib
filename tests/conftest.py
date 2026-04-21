@@ -24,6 +24,19 @@ def pytest_addoption(parser):
         action="store",
         help="Arduino CLI sketch profile name passed to `arduino-cli compile -m`.",
     )
+    parser.addoption(
+        "--upload-mode",
+        action="store",
+        choices=("embedded", "arduino-cli"),
+        default="embedded",
+        help=(
+            "Select how test runs upload firmware: "
+            "'embedded' uses pytest-embedded auto flash with erase-all for clean runs, "
+            "but only supports standard board definitions where the third FQBN field is the chip target; "
+            "'arduino-cli' uses `arduino-cli upload` for wider board support, "
+            "but preserves existing flash contents such as NVS and SPIFFS."
+        ),
+    )
 
 
 # Load simple KEY=VALUE pairs from local dotenv files under tests/.
@@ -65,6 +78,26 @@ for key, value in DOTENV_VALUES.items():
 # Read the optional Arduino sketch profile selected for this pytest run.
 def get_profile_name(config):
     return config.getoption("--profile")
+
+
+# Read the selected firmware upload strategy for this pytest run.
+def get_upload_mode(config):
+    return config.getoption("--upload-mode")
+
+
+# Check whether uploads should be delegated to arduino-cli.
+def is_arduino_cli_upload_mode(config):
+    return get_upload_mode(config).startswith("arduino-cli")
+
+
+# Convert the active profile name into a profile-specific serial port env var.
+def get_profile_port_env_name(config):
+    profile = get_profile_name(config)
+    if not profile:
+        return None
+
+    normalized = profile.upper().replace("-", "_")
+    return f"TEST_SERIAL_PORT_{normalized}"
 
 
 # Map each test app to a profile-specific build output directory.
@@ -121,15 +154,36 @@ def get_build_properties(config, app_path):
     ]
 
 
+# Resolve the upload port using flashing-specific settings first.
+def get_upload_port(config):
+    flash_port = config.getoption("--flash-port")
+    if flash_port:
+        return flash_port
+
+    return config.getoption("--port")
+
+
+# Apply project-specific defaults before pytest starts collecting tests.
 def pytest_configure(config):
     profile = get_profile_name(config) or "default"
+    env_name = get_profile_port_env_name(config)
+    if not config.getoption("--port"):
+        port = os.getenv(env_name) if env_name else None
+        if not port:
+            port = os.getenv("TEST_SERIAL_PORT")
+        if port:
+            config.option.port = port
 
     config.stash[metadata_key]["Profile"] = profile
+    config.stash[metadata_key]["Upload Mode"] = get_upload_mode(config)
 
 
 # Show the active profile in the pytest session header.
 def pytest_report_header(config):
-    return [f"profile: {get_profile_name(config) or 'default'}"]
+    return [
+        f"profile: {get_profile_name(config) or 'default'}",
+        f"upload-mode: {get_upload_mode(config)}",
+    ]
 
 
 @pytest.fixture
@@ -140,7 +194,7 @@ def build_dir(request):
 
 @pytest.fixture(scope="module", autouse=True)
 # Build each sketch automatically unless the run is test-only.
-def build(request):
+def arduino_cli_build(request):
     config = request.config
     run_mode = request.config.getoption("--run-mode")
     if run_mode == "test":
@@ -165,8 +219,52 @@ def build(request):
     subprocess.run(command, cwd=app_path, check=True)
 
 
+@pytest.fixture
+# Disable pytest-embedded autoflash when arduino-cli handles uploads.
+def skip_autoflash(request):
+    if is_arduino_cli_upload_mode(request.config):
+        return True
+
+    return request.config.getoption("--skip-autoflash")
+
+
+@pytest.fixture(scope="module", autouse=True)
+# Upload each sketch with arduino-cli when that upload mode is active.
+def arduino_cli_upload(request, arduino_cli_build):
+    config = request.config
+    if config.getoption("--run-mode") == "build" or not is_arduino_cli_upload_mode(config):
+        return
+
+    app_path = Path(request.fspath).parent
+    build_dir = Path(get_build_dir(config, app_path))
+    if not build_dir.is_dir():
+        raise FileNotFoundError(
+            f"build output directory not found: {build_dir}. "
+            "Run with --run-mode=all first, or build the sketch before test-only runs."
+        )
+
+    command = [
+        "arduino-cli",
+        "upload",
+        "--build-path",
+        str(build_dir),
+    ]
+
+    profile = get_profile_name(config)
+    if profile:
+        command.extend(["-m", profile])
+
+    port = get_upload_port(config)
+    if port:
+        command.extend(["-p", port])
+
+    command.append(str(app_path))
+
+    subprocess.run(command, cwd=app_path, check=True)
+
+
 @pytest.fixture(autouse=True)
 # Skip Python-side DUT execution when running in build-only mode.
-def skip_test_execution_in_build_mode(request, build):
+def skip_test_execution_in_build_mode(request, arduino_cli_build):
     if request.config.getoption("--run-mode") == "build":
         pytest.skip("skipped test execution in build-only mode")

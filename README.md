@@ -127,11 +127,20 @@ The project supports these custom `pytest` options:
 
 - `--run-mode=all|build|test`
 - `--profile <profile-name>`
+- `--upload-mode=embedded|arduino-cli`
+
+`--upload-mode` changes how firmware is written to the board:
+
+- `embedded`
+  Uses the standard `pytest-embedded-arduino` flashing flow. It erases flash and writes the full image, so each run starts from a clean state. This mode is limited to standard board definitions where the third field of the FQBN, such as `esp32:esp32:esp32`, is the chip target.
+- `arduino-cli`
+  Uses `arduino-cli upload`, so it can work with a wider range of Arduino board definitions. This mode does not erase flash first, so data such as NVS or SPIFFS from previous runs can remain on the device.
 
 Examples:
 
 ```bash
 ./tests/run.sh --profile esp32s3
+./tests/run.sh --upload-mode=arduino-cli
 ./tests/run_test.sh --profile esp32s3 tests/esp32_unity_runner/test_unity_runner.py
 ```
 
@@ -139,21 +148,24 @@ If `--profile` is omitted, the build uses the sketch's default profile and store
 
 ## Serial Port Selection
 
-Serial port selection is intentionally left to `pytest-embedded` defaults.
+Serial ports can be set explicitly with `--port`, which is the recommended path for CI.
 
-Use either:
+For local development, `tests/conftest.py` also fills `--port` from dotenv or shell variables when it is not specified directly.
+The lookup order is:
 
 - `--port`
-- `ESPPORT`
+- `TEST_SERIAL_PORT_<PROFILE>`
+- `TEST_SERIAL_PORT`
 
 Examples:
 
 ```bash
-ESPPORT=/dev/ttyUSB0 ./tests/run.sh
+TEST_SERIAL_PORT=/dev/ttyUSB0 ./tests/run.sh
+TEST_SERIAL_PORT_ESP32_S3=/dev/ttyACM0 ./tests/run.sh --profile esp32-s3
 ```
 
 ```bat
-set ESPPORT=COM5
+set TEST_SERIAL_PORT=COM5
 tests\run.bat
 ```
 
@@ -175,7 +187,12 @@ Typical values:
 ```env
 TEST_WIFI_SSID=your-ssid
 TEST_WIFI_PASSWORD=your-password
+TEST_SERIAL_PORT=/dev/ttyUSB0
+TEST_SERIAL_PORT_ESP32=/dev/ttyUSB0
 ```
+
+Profile-specific serial variables are normalized to uppercase with `-` replaced by `_`.
+For example, profile `esp32-s3` maps to `TEST_SERIAL_PORT_ESP32_S3`.
 
 ## Build-Time Defines
 
@@ -202,7 +219,7 @@ HTML reports are generated at:
 
 - `tests/report.html`
 
-The report includes the active Arduino sketch profile in the Environment section.
+The report includes the active Arduino sketch profile and upload mode in the Environment section.
 
 By default, runner scripts remove any previous `report.html` before starting a new run.
 

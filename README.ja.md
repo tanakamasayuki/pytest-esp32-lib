@@ -123,15 +123,24 @@ tests\run_test.bat
 
 ## 主なオプション
 
-このプロジェクト独自に使っている `pytest` オプションは次の 2 つです。
+このプロジェクト独自に使っている `pytest` オプションは次の 3 つです。
 
 - `--run-mode=all|build|test`
 - `--profile <profile-name>`
+- `--upload-mode=embedded|arduino-cli`
+
+`--upload-mode` は、ボードへの書き込み方法を切り替えます。
+
+- `embedded`
+  `pytest-embedded-arduino` の標準書き込みを使います。フラッシュを削除してから全体を書き込むため、毎回クリーンな状態で実行できます。ただし、`esp32:esp32:esp32` のように FQBN の 3 つ目がチップターゲットになる標準的なボード定義でしか使えません。
+- `arduino-cli`
+  `arduino-cli upload` を使うため、より広い Arduino ボード定義で書き込みできます。ただし、事前にフラッシュを削除しないので、前回実行時の NVS や SPIFFS などの内容が残る可能性があります。
 
 例:
 
 ```bash
 ./tests/run.sh --profile esp32s3
+./tests/run.sh --upload-mode=arduino-cli
 ./tests/run_test.sh --profile esp32s3 tests/esp32_unity_runner/test_unity_runner.py
 ```
 
@@ -139,21 +148,24 @@ tests\run_test.bat
 
 ## シリアルポート指定
 
-シリアルポート指定は、独自実装ではなく `pytest-embedded` の標準機能に任せています。
+CI では `--port` を明示指定するのが基本です。
 
-使用できるのは次のいずれかです。
+ローカル開発では、`--port` 未指定時に `tests/conftest.py` が dotenv またはシェルの環境変数から `--port` を補完します。
+解決順は次の通りです。
 
 - `--port`
-- `ESPPORT`
+- `TEST_SERIAL_PORT_<PROFILE>`
+- `TEST_SERIAL_PORT`
 
 例:
 
 ```bash
-ESPPORT=/dev/ttyUSB0 ./tests/run.sh
+TEST_SERIAL_PORT=/dev/ttyUSB0 ./tests/run.sh
+TEST_SERIAL_PORT_ESP32_S3=/dev/ttyACM0 ./tests/run.sh --profile esp32-s3
 ```
 
 ```bat
-set ESPPORT=COM5
+set TEST_SERIAL_PORT=COM5
 tests\run.bat
 ```
 
@@ -175,7 +187,12 @@ tests\run.bat
 ```env
 TEST_WIFI_SSID=your-ssid
 TEST_WIFI_PASSWORD=your-password
+TEST_SERIAL_PORT=/dev/ttyUSB0
+TEST_SERIAL_PORT_ESP32=/dev/ttyUSB0
 ```
+
+profile ごとのシリアル変数名は、大文字化して `-` を `_` に置き換えます。  
+たとえば profile `esp32-s3` は `TEST_SERIAL_PORT_ESP32_S3` になります。
 
 ## ビルド時 define
 
@@ -202,7 +219,7 @@ HTML レポートは次に出力されます。
 
 - `tests/report.html`
 
-レポートの Environment セクションには、使用した Arduino sketch profile が表示されます。
+レポートの Environment セクションには、使用した Arduino sketch profile と upload mode が表示されます。
 
 実行スクリプトは通常、毎回新しい実行前に古い `report.html` を削除します。
 
